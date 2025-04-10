@@ -1,10 +1,10 @@
 ﻿Imports System.IO
 Imports System.Net.NetworkInformation
-Imports System.Text.Json
-Imports System.Text.Json.Nodes
+Imports Newtonsoft.Json
+Imports Newtonsoft.Json.Linq
 
 Public Class Pinger
-    Const Version = "3.0"
+    Dim Version = "4.0_"
 
 
 
@@ -29,6 +29,7 @@ Public Class Pinger
     End Sub
 
     Private Sub Pinger_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Version &= If(Environment.Is64BitProcess, "x64", "x86")
         Text &= $" ({Version})"
         If Environment.GetCommandLineArgs.Length > 1 Then
             Address.LoadAddresses(Me, Environment.GetCommandLineArgs(1))
@@ -91,7 +92,6 @@ Public Class Address
         ' 
         AddressBox = New TextBox With {
             .BorderStyle = BorderStyle.None,
-            .PlaceholderText = "Address",
             .Location = New Point(140, 0),
             .Size = New Size(380, 43),
             .Text = address,
@@ -118,7 +118,6 @@ Public Class Address
         SecBox = New TextBox With {
             .BorderStyle = BorderStyle.None,
             .MaxLength = 4,
-            .PlaceholderText = "x",
             .Location = New Point(670, 0),
             .Size = New Size(70, 43),
             .Text = (sec / 1000).ToString,
@@ -343,9 +342,9 @@ Public Class Address
         saveDialog.FileName = "config.ckping"
         saveDialog.InitialDirectory = Environment.CurrentDirectory
         If saveDialog.ShowDialog() = DialogResult.OK Then
-            Dim addrList As New JsonArray()
+            Dim addrList As New JArray()
             For Each a As Address In addresses
-                Dim addrGroup As New JsonObject From {
+                Dim addrGroup As New JObject From {
                     {"active", a.active},
                     {"address", a.AddressBox.Text},
                     {"interval", CDbl(a.SecBox.Text)}
@@ -354,7 +353,7 @@ Public Class Address
             Next
             Try
                 Dim writer As New StreamWriter(saveDialog.FileName)
-                writer.Write(addrList.ToJsonString(New JsonSerializerOptions With {.WriteIndented = True}))
+                writer.Write(addrList.ToString(Formatting.Indented))
                 writer.Close()
                 writer.Dispose()
             Catch ex As Exception
@@ -377,13 +376,13 @@ Public Class Address
 
         Try
             Dim reader As New StreamReader(fileName)
-            Dim addrList As JsonArray = JsonNode.Parse(reader.ReadToEnd()).AsArray()
+            Dim addrList As JArray = JArray.Parse(reader.ReadToEnd())
             reader.Close()
             reader.Dispose()
 
             For i As Integer = 0 To addrList.Count - 1
-                Dim addrGroup As JsonObject = addrList(i).AsObject()
-                Dim a As New Address(pinger, addrGroup("active").GetValue(Of Boolean), addrGroup("address").GetValue(Of String), addrGroup("interval").GetValue(Of Double) * 1000)
+                Dim addrGroup As JObject = addrList(i)
+                Dim a As New Address(pinger, addrGroup("active"), addrGroup("address"), CInt(addrGroup("interval")) * 1000)
             Next
         Catch ex As Exception
             MsgBox($"An error occured while loading: {vbCrLf & ex.Message}", MsgBoxStyle.Critical, "Error while loading")
